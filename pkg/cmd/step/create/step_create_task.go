@@ -2,12 +2,13 @@ package create
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/jenkins-x/jx/pkg/cmd/step/git"
 
@@ -202,9 +203,14 @@ func (o *StepCreateTaskOptions) AddCommonFlags(cmd *cobra.Command) {
 }
 
 // Run implements this command
-func (o *StepCreateTaskOptions) Run() error {
+func (o *StepCreateTaskOptions) Run() (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("error recovered :  %v", e)
+		}
+	}()
 	var effectiveProjectConfig *config.ProjectConfig
-	var err error
+	//var err error
 
 	tektonClient, jxClient, kubeClient, ns, err := o.getClientsAndNamespace()
 	if err != nil {
@@ -232,6 +238,9 @@ func (o *StepCreateTaskOptions) Run() error {
 		// TODO keeping this to keep existing behavior until then (HF)
 		if o.CloneGitURL != "" {
 			o.CloneDir = o.cloneGitRepositoryToTempDir(o.CloneGitURL, o.Branch, o.PullRequestNumber, o.Revision)
+			if o.CloneDir == "" {
+				return errors.New("failed to clone git repo")
+			}
 			if o.DeleteTempDir {
 				defer func() {
 					log.Logger().Infof("removing the temp directory %s", o.CloneDir)
@@ -976,8 +985,13 @@ func (o *StepCreateTaskOptions) modifyVolumes(container *corev1.Container, volum
 
 func (o *StepCreateTaskOptions) cloneGitRepositoryToTempDir(gitURL string, branch string, pullRequestNumber string, revision string) string {
 	var tmpDir string
-	err := o.Retry(3, time.Second*2, func() error {
-		var err error
+	err := o.Retry(3, time.Second*2, func() (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = fmt.Errorf("git clone error recovered :  %v", e)
+			}
+		}()
+		//var err error
 		tmpDir, err = ioutil.TempDir("", "git")
 		if err != nil {
 			return err
@@ -1031,7 +1045,8 @@ func (o *StepCreateTaskOptions) cloneGitRepositoryToTempDir(gitURL string, branc
 			log.Logger().Warnf("Commit most likely overwritten by force-push, so ignorning underlying error %v", err)
 		} else {
 			log.Logger().Fatalf("failed to clone three times it's likely things wont recover so lets kill the process; %v", err)
-			panic(err)
+			//panic(err)
+			return ""
 		}
 	}
 

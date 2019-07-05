@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jenkins-x/jx/pkg/prow"
-	"github.com/jenkins-x/jx/pkg/util"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
@@ -16,6 +13,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/jenkins-x/jx/pkg/prow"
+	"github.com/jenkins-x/jx/pkg/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/jenkins-x/jx/pkg/cmd/helper"
 	"github.com/jenkins-x/jx/pkg/cmd/step/create"
@@ -211,6 +212,11 @@ func (o *PipelineRunnerOptions) pipeline(w http.ResponseWriter, r *http.Request)
 }
 
 func (o *PipelineRunnerOptions) handlePostRequest(r *http.Request, w http.ResponseWriter) {
+	defer func() {
+		if err := recover(); err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	}()
 	requestParams, err := o.parseStartPipelineRequestParameters(r)
 	if err != nil {
 		o.returnStatusBadRequest(err, "could not read the JSON request body: "+err.Error(), w)
